@@ -230,8 +230,26 @@ async def check_join(c: CallbackQuery):
     )
 
 # ---------- MAIN ----------
+from aiohttp import web
+
+async def health(request):
+    return web.Response(text="Bot is running")
+
+async def start_web():
+    app = web.Application()
+    app.router.add_get("/", health)
+    runner = web.AppRunner(app)
+    await runner.setup()
+    site = web.TCPSite(
+        runner,
+        host="0.0.0.0",
+        port=int(os.environ.get("PORT", 3000))
+    )
+    await site.start()
+
 async def main():
-    print("🤖 Bot running on Render...")
+    print("🤖 Bot running...")
+    await start_web()
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

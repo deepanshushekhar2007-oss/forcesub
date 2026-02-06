@@ -1,4 +1,5 @@
 import asyncio
+import os
 import sqlite3
 from aiogram import Bot, Dispatcher, Router
 from aiogram.types import (
@@ -10,8 +11,9 @@ from aiogram.enums import ChatMemberStatus
 from aiogram.client.default import DefaultBotProperties
 
 # ================= CONFIG =================
-TOKEN = "8418461342:AAH1NJEMnCnYROk6fZrA1hG-ewaV7v38Ndw"
-OWNER_ID = 6860983540  # apna Telegram ID
+TOKEN = os.getenv("8418461342:AAH1NJEMnCnYROk6fZrA1hG-ewaV7v38Ndw")
+OWNER_ID = int(os.getenv("OWNER_ID", "6860983540"))
+
 PROMO_TEXT = (
     "DO YOU WANT TO ADD YOUR CHANNEL AND GET PROMOTED\n"
     "THEN CONTACT @SPIDYWS"
@@ -25,7 +27,8 @@ router = Router()
 dp.include_router(router)
 
 # ---------- DATABASE ----------
-db = sqlite3.connect("data.db")
+DB_PATH = "data.db"
+db = sqlite3.connect(DB_PATH, check_same_thread=False)
 cur = db.cursor()
 
 cur.execute("CREATE TABLE IF NOT EXISTS channels (channel TEXT PRIMARY KEY)")
@@ -66,11 +69,13 @@ def channels_kb(join=False):
 async def is_joined(user_id: int, channel: str) -> bool:
     try:
         member = await bot.get_chat_member(channel, user_id)
-        if member.status in (ChatMemberStatus.MEMBER, ChatMemberStatus.ADMINISTRATOR, ChatMemberStatus.CREATOR):
-            return True
-        return False
+        return member.status in (
+            ChatMemberStatus.MEMBER,
+            ChatMemberStatus.ADMINISTRATOR,
+            ChatMemberStatus.CREATOR
+        )
     except Exception as e:
-        print(f"[JOIN CHECK ERROR] {channel} → {e}")
+        print("JOIN CHECK ERROR:", e)
         return False
 
 def has_access(user_id: int) -> bool:
@@ -90,7 +95,6 @@ async def start(message: Message):
         await message.answer("👑 <b>Owner Panel</b>", reply_markup=owner_panel())
         return
 
-    # notify owner
     await bot.send_message(
         OWNER_ID,
         f"🔔 <b>User Started Bot</b>\n"
@@ -119,7 +123,7 @@ async def give_access(message: Message):
     except:
         await message.reply("❌ Usage: /access user_id")
 
-# ---------- OWNER CHANNEL CONTROL ----------
+# ---------- ADD CHANNEL ----------
 @router.callback_query(lambda c: c.data == "add_channel")
 async def add_channel_prompt(c: CallbackQuery):
     if c.from_user.id != OWNER_ID:
@@ -138,6 +142,7 @@ async def add_channel(message: Message):
     except:
         await message.reply("⚠️ Channel already exists")
 
+# ---------- REMOVE CHANNEL ----------
 @router.callback_query(lambda c: c.data == "remove_channel")
 async def remove_channel(c: CallbackQuery):
     if c.from_user.id != OWNER_ID:
@@ -154,18 +159,22 @@ async def del_channel(c: CallbackQuery):
     db.commit()
     await c.message.edit_text(f"❌ {ch} removed", reply_markup=owner_panel())
 
+# ---------- STATUS ----------
 @router.callback_query(lambda c: c.data == "status")
 async def status(c: CallbackQuery):
     if c.from_user.id != OWNER_ID:
         return
     text = "📊 <b>Channel Status</b>\n\n"
     for ch in get_channels():
-        cur.execute("SELECT COUNT(DISTINCT user_id) FROM joins WHERE channel=?", (ch,))
+        cur.execute(
+            "SELECT COUNT(DISTINCT user_id) FROM joins WHERE channel=?",
+            (ch,)
+        )
         count = cur.fetchone()[0]
         text += f"{ch} → {count} joined\n"
     await c.message.edit_text(text, reply_markup=owner_panel())
 
-# ---------- GROUP FORCE JOIN ----------
+# ---------- FORCE JOIN ----------
 @router.message()
 async def force_join(message: Message):
     if message.from_user.id == OWNER_ID:
@@ -188,33 +197,39 @@ async def force_join(message: Message):
                 pass
             await message.answer(
                 f"🚫 {user_mention}\n\n"
-                "<b>Group me message karne se pehle neeche diye gaye channels join karo 👇</b>",
+                "<b>Message karne se pehle niche diye gaye channels join karo 👇</b>",
                 reply_markup=channels_kb(join=True)
             )
             return
 
-    # Save joins
     for ch in channels:
-        cur.execute("INSERT OR IGNORE INTO joins VALUES (?,?)", (user.id, ch))
+        cur.execute(
+            "INSERT OR IGNORE INTO joins VALUES (?, ?)",
+            (user.id, ch)
+        )
     db.commit()
 
 # ---------- JOIN CHECK ----------
 @router.callback_query(lambda c: c.data == "check_join")
 async def check_join(c: CallbackQuery):
-    await asyncio.sleep(3)  # delay fix
+    await asyncio.sleep(3)
     for ch in get_channels():
         if not await is_joined(c.from_user.id, ch):
             await c.answer(
-                "❌ Abhi join detect nahi hua.\n"
-                "Channel open karke join karo aur phir Check Again dabao",
+                "❌ Abhi join detect nahi hua.\nJoin karke Check Again dabao",
                 show_alert=True
             )
             return
-    await c.message.edit_text("✅ <b>Access granted. Now you cqn send msg in this group . If you want to add your channel in the bot and get promoted then contact : @SPIDYWS </b>")
+
+    await c.message.edit_text(
+        "✅ <b>Access granted.</b>\n"
+        "Ab group me message kar sakte ho.\n\n"
+        "Promotion ke liye contact: @SPIDYWS"
+    )
 
 # ---------- MAIN ----------
 async def main():
-    print("Bot is running...")
+    print("🤖 Bot running on Render...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":

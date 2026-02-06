@@ -1,0 +1,13 @@
+services:
+  - type: worker
+    name: forcesub-bot
+    env: python
+    plan: free
+    pythonVersion: 3.11.9
+    buildCommand: pip install -r requirements.txt
+    startCommand: python channel.py
+    envVars:
+      - key: BOT_TOKEN
+        sync: false
+      - key: OWNER_ID
+        value: "6860983540"

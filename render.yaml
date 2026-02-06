@@ -1,7 +1,0 @@
-services:
-  - type: web
-    name: forcesub-bot
-    env: python
-    pythonVersion: 3.11
-    buildCommand: pip install -r requirements.txt
-    startCommand: python main.py

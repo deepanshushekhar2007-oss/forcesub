@@ -11,8 +11,10 @@ from aiogram.enums import ChatMemberStatus
 from aiogram.client.default import DefaultBotProperties
 
 # ================= CONFIG =================
-TOKEN = os.getenv("8418461342:AAH1NJEMnCnYROk6fZrA1hG-ewaV7v38Ndw")
+# ================= CONFIG =================
+TOKEN = os.getenv("BOT_TOKEN")
 OWNER_ID = int(os.getenv("OWNER_ID", "6860983540"))
+# =========================================
 
 PROMO_TEXT = (
     "DO YOU WANT TO ADD YOUR CHANNEL AND GET PROMOTED\n"

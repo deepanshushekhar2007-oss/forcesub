@@ -1,17 +1,22 @@
 import os
 from aiogram import Bot, Dispatcher, types
-from aiogram.filters import Command, ContentTypeFilter
+from aiogram.filters import Command
 from aiogram.utils.keyboard import ReplyKeyboardMarkup, KeyboardButton
 from PIL import Image, ImageDraw, ImageFont
 import pytesseract
 import asyncio
 
-API_TOKEN = os.getenv("API_TOKEN")  # Must be set in Render or local env
+# ----------------------------
+API_TOKEN = os.getenv("API_TOKEN")  # Set in Render environment
 if not API_TOKEN:
     raise ValueError("API_TOKEN environment variable is missing!")
+# ----------------------------
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
+
+# Dictionary to store user screenshot paths
+user_data = {}
 
 # ---------- Function to replace members number ----------
 def replace_members_number_exact(image_path, new_number, output_path):
@@ -35,7 +40,7 @@ def replace_members_number_exact(image_path, new_number, output_path):
             # Cover old number
             draw.rectangle([x, y, x+w, y+h], fill=bg_color)
 
-            # Font same height
+            # Try exact font size
             try:
                 font = ImageFont.truetype("DejaVuSans-Bold.ttf", h)
             except:
@@ -67,7 +72,7 @@ async def cmd_start(message: types.Message):
     )
 
 # ---------- Handle photo ----------
-@dp.message(ContentTypeFilter(types=['photo']))
+@dp.message(lambda m: m.content_type == types.ContentType.PHOTO)
 async def handle_photo(message: types.Message):
     uid = message.from_user.id
 
@@ -78,10 +83,8 @@ async def handle_photo(message: types.Message):
     with open(img_path, "wb") as f:
         f.write(downloaded_file.read())
 
-    # Save path in memory (simple dictionary)
-    if not hasattr(dp, "user_data"):
-        dp.user_data = {}
-    dp.user_data[uid] = {"img_path": img_path}
+    # Store path in dictionary
+    user_data[uid] = {"img_path": img_path}
 
     await message.answer("✅ Screenshot received! Now send the number you want to replace 'members' with.")
 
@@ -90,18 +93,17 @@ async def handle_photo(message: types.Message):
 async def handle_number(message: types.Message):
     uid = message.from_user.id
 
-    try:
-        number = int(message.text)
-    except ValueError:
+    if not message.text.isdigit():
         await message.reply("Please send a valid number (e.g., 50).")
         return
 
-    user_info = getattr(dp, "user_data", {}).get(uid)
-    if not user_info or not os.path.exists(user_info.get("img_path", "")):
+    number = int(message.text)
+
+    if uid not in user_data or not os.path.exists(user_data[uid].get("img_path", "")):
         await message.reply("❌ Please send a screenshot first.")
         return
 
-    img_path = user_info["img_path"]
+    img_path = user_data[uid]["img_path"]
     output_path = f"{uid}_ss_updated.png"
     replace_members_number_exact(img_path, number, output_path)
 

@@ -1,13 +1,13 @@
 import os
+import asyncio
 from aiogram import Bot, Dispatcher, types
 from aiogram.filters import Command
 from aiogram.utils.keyboard import ReplyKeyboardMarkup, KeyboardButton
 from PIL import Image, ImageDraw, ImageFont
 import pytesseract
-import asyncio
 
 # ----------------------------
-API_TOKEN = os.getenv("API_TOKEN")  # Set in Render environment
+API_TOKEN = os.getenv("API_TOKEN")  # Must set in Render environment
 if not API_TOKEN:
     raise ValueError("API_TOKEN environment variable is missing!")
 # ----------------------------
@@ -111,6 +111,9 @@ async def handle_number(message: types.Message):
         await message.answer_photo(f, caption=f"✅ Number replaced with {number}")
 
 # ---------- Run bot ----------
+async def main():
+    print("Bot is starting...")
+    await dp.start_polling(bot)
+
 if __name__ == "__main__":
-    from aiogram import executor
-    executor.start_polling(dp)
+    asyncio.run(main())

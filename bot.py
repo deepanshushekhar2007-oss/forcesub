@@ -1,122 +1,109 @@
-import asyncio
 import os
-import cv2
-import numpy as np
-import pytesseract
-from aiogram import Bot, Dispatcher, F
-from aiogram.types import Message, FSInputFile
-from aiogram.filters import CommandStart
+from aiogram import Bot, Dispatcher, types
+from aiogram.types import ContentType
+from aiogram.filters import Command
+from aiogram.utils.keyboard import ReplyKeyboardMarkup, KeyboardButton
 from PIL import Image, ImageDraw, ImageFont
+import pytesseract
 
-API_TOKEN = "8534970960:AAEBslbIwNoDZT8VsZMdcfLxhhIEaOMtmmM"
+API_TOKEN = os.getenv("API_TOKEN")  # Set this in Render environment
 
 bot = Bot(token=API_TOKEN)
 dp = Dispatcher()
 
-user_photos = {}
-
-# ================= OCR DETECTION =================
-def detect_member_number(image_path):
-    img = cv2.imread(image_path)
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-
-    # Improve contrast
-    gray = cv2.GaussianBlur(gray, (3,3), 0)
-
-    data = pytesseract.image_to_data(gray, output_type=pytesseract.Output.DICT)
-
-    for i, text in enumerate(data["text"]):
-        if text.isdigit():
-            x = data["left"][i]
-            y = data["top"][i]
-            w = data["width"][i]
-            h = data["height"][i]
-            return (x, y, w, h)
-
-    return None
-
-
-# ================= REPLACE NUMBER =================
-def replace_number(image_path, output_path, new_number):
-    img = Image.open(image_path).convert("RGB")
+# --- Function to replace members number ---
+def replace_members_number_exact(image_path, new_number, output_path):
+    img = Image.open(image_path)
     draw = ImageDraw.Draw(img)
+    data = pytesseract.image_to_data(img, output_type=pytesseract.Output.DICT)
 
-    bbox = detect_member_number(image_path)
+    for i, text in enumerate(data['text']):
+        if "members" in text.lower():
+            number_index = i - 1
+            if number_index < 0:
+                continue
 
-    if not bbox:
-        img.save(output_path)
-        return False
+            x, y, w, h = (data['left'][number_index], data['top'][number_index],
+                          data['width'][number_index], data['height'][number_index])
 
-    x, y, w, h = bbox
+            # Sample background from old number
+            old_area = img.crop((x, y, x+w, y+h))
+            bg_color = old_area.getpixel((0, 0))
 
-    # Sample background
-    crop = img.crop((x, y, x+w, y+h))
-    avg_color = tuple(int(c) for c in crop.resize((1,1)).getpixel((0,0)))
+            draw.rectangle([x, y, x+w, y+h], fill=bg_color)
 
-    # Cover old number
-    draw.rectangle((x-2, y-2, x+w+2, y+h+2), fill=avg_color)
+            # Try exact font size
+            try:
+                font = ImageFont.truetype("DejaVuSans-Bold.ttf", h)
+            except:
+                font = ImageFont.load_default()
 
-    # Load font
-    try:
-        font = ImageFont.truetype("DejaVuSans-Bold.ttf", h)
-    except:
-        font = ImageFont.load_default()
+            # Average color of old number
+            pixels = list(old_area.getdata())
+            if pixels:
+                avg_color = tuple(sum(p[i] for p in pixels)//len(pixels) for i in range(3))
+            else:
+                avg_color = (0, 128, 0)
 
-    # Telegram green color
-    draw.text((x, y), str(new_number), font=font, fill=(0, 200, 120))
+            draw.text((x, y), str(new_number), fill=avg_color, font=font)
+            break
 
     img.save(output_path)
-    return True
+    return output_path
 
+# --- Start command ---
+@dp.message(Command(commands=["start"]))
+async def start_cmd(message: types.Message):
+    kb = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="Send Screenshot")]
+        ], resize_keyboard=True
+    )
+    await message.answer("Send me your screenshot and the number you want to replace the members with.", reply_markup=kb)
 
-# ================= START =================
-@dp.message(CommandStart())
-async def start_cmd(message: Message):
-    await message.answer("📸 Send Telegram screenshot.\nThen send new member count.")
+# --- Handle photo ---
+@dp.message(content_types=ContentType.PHOTO)
+async def handle_photo(message: types.Message):
+    uid = message.from_user.id
+    await message.answer("✅ Screenshot received! Now send the number you want to replace the members with.")
+    
+    # Save photo
+    file_info = await bot.get_file(message.photo[-1].file_id)
+    downloaded_file = await bot.download_file(file_info.file_path)
+    img_path = f"{uid}_ss.png"
+    with open(img_path, "wb") as f:
+        f.write(downloaded_file.read())
 
-# ================= HANDLE PHOTO =================
-@dp.message(F.photo)
-async def handle_photo(message: Message):
-    photo = message.photo[-1]
-    file_path = f"temp_{message.from_user.id}.jpg"
-    await bot.download(photo, destination=file_path)
+    # Store file path in user context
+    dp.current_state(chat=uid, user=uid).update_data(img_path=img_path)
 
-    user_photos[message.from_user.id] = file_path
-    await message.answer("✅ Screenshot received.\nNow send new member count.")
-
-# ================= HANDLE NUMBER =================
-@dp.message(F.text.regexp(r'^\d+$'))
-async def handle_number(message: Message):
-    user_id = message.from_user.id
-
-    if user_id not in user_photos:
-        await message.answer("❌ Send screenshot first.")
+# --- Handle number ---
+@dp.message()
+async def handle_number(message: types.Message):
+    uid = message.from_user.id
+    try:
+        number = int(message.text)
+    except ValueError:
+        await message.reply("Please send a valid number.")
         return
 
-    new_number = message.text
-    input_path = user_photos[user_id]
-    output_path = f"edited_{user_id}.jpg"
-
-    processing = await message.answer("⚙ Processing with OCR...")
-
-    success = replace_number(input_path, output_path, new_number)
-
-    if not success:
-        await processing.edit_text("❌ Could not detect member number.")
+    # Get last uploaded screenshot
+    state = dp.current_state(chat=uid, user=uid)
+    data = await state.get_data()
+    img_path = data.get("img_path")
+    if not img_path or not os.path.exists(img_path):
+        await message.reply("Please send a screenshot first.")
         return
 
-    await message.answer_photo(FSInputFile(output_path))
+    output_path = f"{uid}_ss_updated.png"
+    replace_members_number_exact(img_path, number, output_path)
 
-    await processing.delete()
+    # Send back updated screenshot
+    with open(output_path, "rb") as f:
+        await message.answer_photo(f, caption=f"✅ Number replaced with {number}")
 
-    os.remove(input_path)
-    os.remove(output_path)
-    user_photos.pop(user_id)
-
-
-# ================= RUN =================
-async def main():
-    await dp.start_polling(bot)
-
+# --- Run bot ---
 if __name__ == "__main__":
-    asyncio.run(main())
+    import asyncio
+    from aiogram import executor
+    executor.start_polling(dp)

@@ -26,6 +26,7 @@ async function connectAccount(chatId, accountName, rawNumber) {
     return bot.sendMessage(chatId, "❌ Invalid number format")
   }
 
+  // ✅ FREE PLAN SESSION PATH (No Disk Required)
   const sessionPath = `/tmp/${chatId}_${accountName}`
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
@@ -39,21 +40,18 @@ async function connectAccount(chatId, accountName, rawNumber) {
 
   sock.ev.on("creds.update", saveCreds)
 
-  let pairingSent = false  // 🔥 important flag
-
   sock.ev.on("connection.update", async (update) => {
 
-    const { connection } = update
+    const { connection, lastDisconnect } = update
 
-    if (!state.creds.registered && !pairingSent) {
-      pairingSent = true
+    if (connection === "connecting") {
       try {
         const code = await sock.requestPairingCode(number)
         bot.sendMessage(chatId,
           `🔐 Pairing Code for ${accountName}:\n\n${code}\n\nGo to WhatsApp → Linked Devices → Link with phone number instead`
         )
       } catch (err) {
-        console.log("Pairing error:", err)
+        console.log(err)
         bot.sendMessage(chatId, "❌ Failed to generate pairing code")
       }
     }
@@ -63,7 +61,11 @@ async function connectAccount(chatId, accountName, rawNumber) {
     }
 
     if (connection === "close") {
-      bot.sendMessage(chatId, `⚠ ${accountName} Disconnected`)
+      if (lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) {
+        connectAccount(chatId, accountName, number)
+      } else {
+        bot.sendMessage(chatId, `⚠ ${accountName} Logged Out`)
+      }
     }
   })
 }

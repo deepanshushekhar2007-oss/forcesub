@@ -4,8 +4,6 @@ import makeWASocket, {
   DisconnectReason
 } from "@whiskeysockets/baileys"
 import TelegramBot from "node-telegram-bot-api"
-import path from "path"
-import fs from "fs"
 
 const app = express()
 const PORT = process.env.PORT || 3000
@@ -15,7 +13,7 @@ let sessions = {}
 let intervalTime = 30000
 let chatInterval = null
 
-// ✅ Number Cleaner (Supports All Countries)
+// ✅ Clean Number (All Countries Supported)
 function cleanNumber(number) {
   return number.replace(/[^0-9]/g, "")
 }
@@ -25,10 +23,11 @@ async function connectAccount(chatId, accountName, rawNumber) {
   const number = cleanNumber(rawNumber)
 
   if (number.length < 8) {
-    return bot.sendMessage(chatId, "❌ Invalid Number Format")
+    return bot.sendMessage(chatId, "❌ Invalid number format")
   }
 
-  const sessionPath = `./sessions/${chatId}_${accountName}`
+  // ✅ FREE PLAN SESSION PATH (No Disk Required)
+  const sessionPath = `/tmp/${chatId}_${accountName}`
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionPath)
 
@@ -52,8 +51,8 @@ async function connectAccount(chatId, accountName, rawNumber) {
           `🔐 Pairing Code for ${accountName}:\n\n${code}\n\nGo to WhatsApp → Linked Devices → Link with phone number instead`
         )
       } catch (err) {
+        console.log(err)
         bot.sendMessage(chatId, "❌ Failed to generate pairing code")
-        console.log("Pairing Error:", err)
       }
     }
 
@@ -72,14 +71,13 @@ async function connectAccount(chatId, accountName, rawNumber) {
 }
 
 //
-// ✅ START COMMAND (Full Guide)
+// ✅ START COMMAND
 //
 bot.onText(/\/start/, (msg) => {
-
   bot.sendMessage(msg.chat.id, `
-🤖 *WhatsApp Auto Chat Bot*
+🤖 *WhatsApp Auto Chat Bot (Free Version)*
 
-📌 How To Use:
+📌 Steps:
 
 1️⃣ Connect First Account
 /connect1
@@ -91,21 +89,19 @@ Then:
 Then:
 /number2 1234567890
 
-🌍 Works For All Countries
-(With Country Code – No + needed)
+🌍 Works for all countries (with country code)
 
-3️⃣ Set Time Interval
+3️⃣ Set Time
 /settime 30
 
-4️⃣ Start Auto Chat
+4️⃣ Start Chat
 /startchat
 
-5️⃣ Stop Chat
+5️⃣ Stop
 /stopchat
 
-⚠ Keep interval 20+ seconds for safety.
+⚠ If server restarts, you must reconnect accounts again.
 `, { parse_mode: "Markdown" })
-
 })
 
 //
@@ -133,7 +129,7 @@ bot.onText(/\/number2 (.+)/, (msg, match) => {
 bot.onText(/\/settime (.+)/, (msg, match) => {
   const seconds = parseInt(match[1])
   if (isNaN(seconds) || seconds < 10)
-    return bot.sendMessage(msg.chat.id, "❌ Minimum 10 seconds required")
+    return bot.sendMessage(msg.chat.id, "❌ Minimum 10 seconds allowed")
 
   intervalTime = seconds * 1000
   bot.sendMessage(msg.chat.id, `⏱ Time set to ${seconds} seconds`)
@@ -156,9 +152,9 @@ bot.onText(/\/startchat/, async (msg) => {
   chatInterval = setInterval(async () => {
     try {
       await sock1.sendMessage(sock2.user.id, { text: "Hello 👋" })
-      await sock2.sendMessage(sock1.user.id, { text: "Hi there 😎" })
+      await sock2.sendMessage(sock1.user.id, { text: "Hi 😎" })
     } catch (err) {
-      console.log("Chat Error:", err)
+      console.log(err)
     }
   }, intervalTime)
 

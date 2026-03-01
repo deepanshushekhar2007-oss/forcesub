@@ -1,8 +1,13 @@
 import express from "express"
-import makeWASocket, {
+
+
+import * as baileys from "@whiskeysockets/baileys"
+
+const {
+  default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason
-} from "@whiskeysockets/baileys"
+} = baileys
 import TelegramBot from "node-telegram-bot-api"
 
 const app = express()

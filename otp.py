@@ -315,16 +315,13 @@ async def send_otp(call: CallbackQuery):
         f"Reply to this message with OTP."
     )
 
+    
     await call.answer(
-            "━━━━━━━━━━━━━━━━━━\n"
-            "✅ NUMBER ACTIVATED SUCCESSFULLY\n\n"
-            "📲 No worries!\n\n"
-            "As soon as the OTP is delivered,\n"
-            "it will be automatically forwarded here.\n\n"
-            "⚠️ If you do not receive the OTP within 5 minutes,\n"
-            "please try another number.\n"
-            "━━━━━━━━━━━━━━━━━━",
-            show_alert=True
+        "✅ NUMBER ACTIVATED SUCCESSFULLY\n\n"
+        "OTP will be forwarded here automatically.\n\n"
+        "If you do not receive the OTP within 5 minutes,\n"
+        "please try another number.",
+        show_alert=True
         )
 # ---------------- ADMIN OTP REPLY ----------------
 @dp.message(F.reply_to_message)

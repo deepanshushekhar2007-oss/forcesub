@@ -17,7 +17,7 @@ from aiogram.client.default import DefaultBotProperties
 TOKEN = "8602466322:AAEIiEnCneUaYPj-QxXmyFEH31A4T9PfQuQ"
 ADMIN_ID = 6860983540
 ALLOWED_GROUP_ID = -1003400610239   # Yaha apna real group ID daalo
-OTP_GROUP_LINK = "https://t.me/SPIDYOTP"
+OTP_GROUP_LINK = "https://t.me/+5DdPIx1svDM5YjE1"
 FORCE_CHANNEL = "@SPIDY_W_S"
 
 bot = Bot(

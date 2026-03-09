@@ -241,7 +241,7 @@ async def start(message: Message):
         inline_keyboard=[
             [
                 InlineKeyboardButton(
-                    text="🌍 Choose Your Country"
+                    text="🌍 Choose Your Country",
                     callback_data="select_country"
                 )
             ]
